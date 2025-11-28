@@ -2,12 +2,17 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CYBERPUNK NEURAL LINK v3.7 // HUD INTERFACE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CYBERPUNK NEURAL LINK v4.0 // MOBILE FIT</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
-        :root { --neon-blue: #00f3ff; --neon-pink: #ff0055; --neon-yellow: #fcee0a; --bg-dark: #050505; --glass: rgba(0, 20, 30, 0.75); }
-        body { margin: 0; overflow: hidden; background-color: var(--bg-dark); font-family: 'Share Tech Mono', monospace; color: var(--neon-blue); user-select: none; }
+        :root { --neon-blue: #00f3ff; --neon-pink: #ff0055; --neon-yellow: #fcee0a; --bg-dark: #050505; --glass: rgba(0, 20, 30, 0.85); }
+        
+        body { 
+            margin: 0; overflow: hidden; background-color: var(--bg-dark); 
+            font-family: 'Share Tech Mono', monospace; color: var(--neon-blue); 
+            user-select: none; -webkit-user-select: none; touch-action: none; /* 禁止默认触摸行为 */
+        }
         
         /* 视觉特效层 */
         #crt-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06)); background-size: 100% 2px, 3px 100%; pointer-events: none; z-index: 999; }
@@ -15,111 +20,121 @@
         #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
 
         /* HUD - 顶部状态 */
-        #hud-top { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 10; text-align: center; pointer-events: none; }
+        #hud-top { position: absolute; top: 15px; width: 100%; z-index: 10; text-align: center; pointer-events: none; }
         #status-box { 
-            border: 1px solid var(--neon-blue); background: var(--glass); padding: 10px 40px; 
-            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%); 
+            display: inline-block;
+            border: 1px solid var(--neon-blue); background: var(--glass); padding: 8px 25px; 
+            clip-path: polygon(15px 0, 100% 0, 100% 70%, calc(100% - 15px) 100%, 0 100%, 0 30%); 
             box-shadow: 0 0 15px rgba(0, 243, 255, 0.15); backdrop-filter: blur(4px); transition: all 0.3s; 
         }
-        #gesture-icon { font-size: 32px; display: block; margin-bottom: 5px; text-shadow: 0 0 10px currentColor; }
-        #gesture-text { font-size: 14px; letter-spacing: 3px; font-weight: bold; }
+        #gesture-icon { font-size: 24px; display: block; line-height: 1; text-shadow: 0 0 10px currentColor; }
+        #gesture-text { font-size: 12px; letter-spacing: 2px; font-weight: bold; margin-top: 4px; }
 
-        /* HUD - 底部面板 */
-        #bottom-panel { position: absolute; bottom: 30px; left: 30px; display: flex; gap: 15px; align-items: flex-end; z-index: 10; }
-        #cam-container { position: relative; width: 200px; height: 150px; border: 1px solid var(--neon-pink); background: #000; box-shadow: 0 0 20px rgba(255, 0, 85, 0.1); }
-        #cam-container::before { content: ''; position: absolute; top:-2px; left:-2px; width: 10px; height: 10px; border-top: 2px solid var(--neon-pink); border-left: 2px solid var(--neon-pink); }
-        #cam-container::after { content: ''; position: absolute; bottom:-2px; right:-2px; width: 10px; height: 10px; border-bottom: 2px solid var(--neon-pink); border-right: 2px solid var(--neon-pink); }
+        /* HUD - 摄像头 (移动端放在左上角) */
+        #cam-wrapper { 
+            position: absolute; top: 15px; left: 15px; z-index: 15; 
+            width: 80px; height: 60px; 
+            border: 1px solid var(--neon-pink); background: #000; 
+            box-shadow: 0 0 10px rgba(255, 0, 85, 0.2);
+            pointer-events: auto; /* 允许点击 */
+            transition: opacity 0.3s;
+        }
+        #cam-wrapper.hidden { opacity: 0; pointer-events: none; }
         #video-input { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); opacity: 0.6; filter: grayscale(100%) contrast(1.2); }
-        
-        /* HUD - 日志 */
-        #debug-log { 
-            width: 240px; height: 150px; 
-            border-left: 2px solid var(--neon-blue); 
-            background: linear-gradient(90deg, rgba(0, 20, 30, 0.8), transparent);
-            padding: 10px; box-sizing: border-box;
-            font-size: 11px; color: rgba(255,255,255,0.7); 
-            display: flex; flex-direction: column; justify-content: flex-end;
-            overflow: hidden; 
-        }
-        .log-line { margin-bottom: 4px; border-bottom: 1px solid rgba(0, 243, 255, 0.1); padding-bottom: 2px; animation: fadeIn 0.3s ease-out; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'Share Tech Mono'; }
+        .cam-label { position: absolute; bottom: 0; right: 0; background: var(--neon-pink); color: #000; font-size: 8px; padding: 1px 3px; font-weight: bold; }
 
-        /* ==================== 赛博控制面板 (右侧) ==================== */
+        /* ==================== 赛博控制面板 ==================== */
         #cyber-panel {
-            position: absolute; top: 50%; right: 20px; transform: translateY(-50%);
-            width: 280px;
-            background: rgba(5, 10, 15, 0.85);
-            border: 1px solid rgba(0, 243, 255, 0.3);
-            backdrop-filter: blur(8px);
+            position: absolute; 
             z-index: 20;
-            padding: 20px;
-            clip-path: polygon(
-                0 0, 100% 0, 
-                100% calc(100% - 20px), calc(100% - 20px) 100%, 
-                0 100%
-            );
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-            font-family: 'Share Tech Mono';
-        }
-        #cyber-panel::before {
-            content: "SYS_CONFIG_V3.7";
-            position: absolute; top: -10px; right: 10px;
-            background: var(--bg-dark); border: 1px solid var(--neon-blue);
-            color: var(--neon-blue); font-size: 10px; padding: 2px 5px;
-            letter-spacing: 1px;
-        }
-
-        .panel-section { margin-bottom: 20px; border-left: 2px solid rgba(255,255,255,0.1); padding-left: 10px; transition: border-color 0.3s; }
-        .panel-section:hover { border-left-color: var(--neon-blue); }
-        
-        .section-title { 
-            color: var(--neon-pink); font-size: 12px; font-weight: bold; margin-bottom: 10px; 
-            text-transform: uppercase; letter-spacing: 2px; display: flex; align-items: center;
-        }
-        .section-title::after { content:''; flex:1; height:1px; background: rgba(255,0,85,0.3); margin-left: 10px; }
-
-        /* 自定义控件样式 */
-        .control-row { margin-bottom: 12px; }
-        .control-label { display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-bottom: 4px; }
-        .control-val { color: var(--neon-yellow); font-family: 'Orbitron'; }
-
-        /* 下拉菜单 */
-        select.cyber-select {
-            width: 100%; background: #000; border: 1px solid var(--neon-blue); color: var(--neon-blue);
-            padding: 5px; font-family: 'Share Tech Mono'; outline: none; cursor: pointer;
-            box-shadow: 0 0 5px rgba(0, 243, 255, 0.2);
-        }
-        select.cyber-select:hover { background: #001a20; }
-
-        /* 滑块 (Input Range) */
-        input[type=range] {
-            -webkit-appearance: none; width: 100%; background: transparent; margin: 5px 0;
-        }
-        input[type=range]:focus { outline: none; }
-        /* 轨道 */
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%; height: 4px; cursor: pointer;
-            background: rgba(0, 243, 255, 0.2); border-radius: 0;
+            background: rgba(5, 12, 18, 0.95);
             border: 1px solid rgba(0, 243, 255, 0.3);
+            backdrop-filter: blur(10px);
+            font-family: 'Share Tech Mono';
+            transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1); /* 平滑过渡动画 */
+            display: flex; flex-direction: column;
         }
-        /* 滑块头 */
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 12px; width: 8px; margin-top: -5px;
-            background: var(--neon-blue);
-            border: 1px solid #fff;
-            box-shadow: 0 0 10px var(--neon-blue);
-            cursor: pointer;
+        
+        /* 桌面端样式 (默认) */
+        @media (min-width: 769px) {
+            #cyber-panel {
+                top: 50%; right: 20px; transform: translateY(-50%);
+                width: 280px; max-height: 80vh; overflow-y: auto;
+                padding: 20px;
+                clip-path: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+            }
+            #panel-header { display: none; } /* 桌面端不需要折叠条 */
         }
-        input[type=range]:hover::-webkit-slider-thumb { background: #fff; }
 
-        /* Checkbox */
-        .checkbox-row { display: flex; align-items: center; cursor: pointer; font-size: 11px; color: #ccc; }
-        .checkbox-row input { margin-right: 10px; accent-color: var(--neon-blue); }
+        /* 移动端样式 (底部抽屉) */
+        @media (max-width: 768px) {
+            #cyber-panel {
+                bottom: 0; left: 0; width: 100%; 
+                border-radius: 15px 15px 0 0;
+                border-bottom: none; border-left: none; border-right: none;
+                border-top: 1px solid var(--neon-blue);
+                box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+                padding: 0; /* padding由内部元素控制 */
+                max-height: 60vh; /* 最大高度 */
+            }
+            
+            /* 最小化状态：向下移动，只露出头部 */
+            #cyber-panel.minimized {
+                transform: translateY(calc(100% - 40px)); /* 保留40px头部 */
+            }
+
+            /* 移动端内容区域滚动 */
+            #panel-content {
+                padding: 20px;
+                overflow-y: auto;
+                /* 增加底部空间防止由于iPhone底部条导致点不到 */
+                padding-bottom: 40px; 
+            }
+        }
+
+        /* 移动端折叠控制条 */
+        #panel-header {
+            height: 40px;
+            background: linear-gradient(90deg, rgba(0, 243, 255, 0.1), rgba(0, 243, 255, 0.05));
+            border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            font-size: 12px; letter-spacing: 2px; color: var(--neon-blue);
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        #panel-header:active { background: rgba(0, 243, 255, 0.2); }
+        .toggle-arrow { transition: transform 0.3s; display: inline-block; margin-right: 8px; }
+        /* 最小化时箭头朝上 */
+        .minimized .toggle-arrow { transform: rotate(180deg); }
+
+        /* 控件通用样式 */
+        .panel-section { margin-bottom: 15px; border-left: 2px solid rgba(255,255,255,0.1); padding-left: 10px; }
+        .section-title { color: var(--neon-pink); font-size: 12px; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        .control-row { margin-bottom: 12px; }
+        .control-label { display: flex; justify-content: space-between; font-size: 11px; color: #889; margin-bottom: 5px; }
+        .control-val { color: var(--neon-yellow); font-family: 'Orbitron'; }
+        
+        select.cyber-select {
+            width: 100%; background: #081015; border: 1px solid var(--neon-blue); color: var(--neon-blue);
+            padding: 8px; font-family: 'Share Tech Mono'; outline: none; border-radius: 4px;
+        }
+        
+        /* 优化滑块触摸区域 */
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; height: 20px; margin: 0; display: block; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: rgba(0, 243, 255, 0.2); border-radius: 2px; align-self: center; }
+        input[type=range]::-webkit-slider-thumb { 
+            -webkit-appearance: none; height: 18px; width: 18px; margin-top: -7px; 
+            background: var(--neon-blue); border-radius: 50%; box-shadow: 0 0 10px var(--neon-blue); 
+            border: 2px solid #fff;
+        }
 
         /* Loading */
         #loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.8s; pointer-events: none; }
         .loader-bar { width: 200px; height: 4px; background: #333; margin-top: 20px; position: relative; overflow: hidden; }
         .loader-progress { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: var(--neon-blue); box-shadow: 0 0 10px var(--neon-blue); transition: width 0.3s; }
+
     </style>
     
     <script type="importmap">
@@ -132,9 +147,10 @@
     <div id="vignette"></div>
 
     <div id="loader">
-        <h1 style="font-family: 'Orbitron'; letter-spacing: 5px; color: var(--neon-blue);">NEURAL LINK v3.7</h1>
+        <h1 style="font-family: 'Orbitron'; letter-spacing: 5px; color: var(--neon-blue);">NEURAL LINK</h1>
+        <div style="font-size:10px; color:var(--neon-pink); letter-spacing:2px;">MOBILE OPTIMIZED</div>
         <div class="loader-bar"><div class="loader-progress" id="progress-fill"></div></div>
-        <div id="loader-text" style="margin-top: 10px; color: #666; font-size: 12px;">加载全息界面...</div>
+        <div id="loader-text" style="margin-top: 10px; color: #666; font-size: 12px;">正在校准光学传感器...</div>
     </div>
 
     <div id="hud-top">
@@ -143,55 +159,54 @@
             <div id="gesture-text">等待信号</div>
         </div>
     </div>
-
-    <div id="bottom-panel">
-        <div id="cam-container">
-            <video id="video-input" playsinline muted autoplay></video>
-            <div style="position: absolute; top: 2px; left: 2px; font-size: 9px; color: var(--neon-pink); background: black; padding: 1px 4px;">LIVE_FEED</div>
-        </div>
-        <div id="debug-log"></div>
+    
+    <div id="cam-wrapper">
+        <video id="video-input" playsinline muted autoplay></video>
+        <div class="cam-label">CAM_01</div>
     </div>
 
-    <div id="cyber-panel">
-        <div class="panel-section">
-            <div class="section-title">核心模式 (CORE)</div>
-            <div class="control-row">
-                <select id="inp-model" class="cyber-select"></select>
-            </div>
-            <div class="control-row">
-                <div class="control-label">全局缩放 <span id="val-scale" class="control-val">1.0</span></div>
-                <input type="range" id="inp-scale" min="0.1" max="3.0" step="0.01">
-            </div>
-            <div class="checkbox-row">
-                <input type="checkbox" id="inp-rotate" checked> <label for="inp-rotate">自动旋转 (AUTO-ROT)</label>
-            </div>
+    <div id="cyber-panel" class="minimized"> <div id="panel-header">
+            <span class="toggle-arrow">▼</span> <span id="header-text">系统设置 (SYSTEM)</span>
         </div>
+        
+        <div id="panel-content">
+            <div class="panel-section">
+                <div class="section-title">核心模式</div>
+                <div class="control-row">
+                    <select id="inp-model" class="cyber-select"></select>
+                </div>
+                <div class="control-row">
+                    <div class="control-label">模型大小 <span id="val-scale" class="control-val">1.0</span></div>
+                    <input type="range" id="inp-scale" min="0.1" max="3.0" step="0.01">
+                </div>
+            </div>
 
-        <div class="panel-section">
-            <div class="section-title">视觉系统 (VISUAL)</div>
-            <div class="control-row">
-                <div class="control-label">辉光强度 <span id="val-bloom" class="control-val">1.5</span></div>
-                <input type="range" id="inp-bloom" min="0" max="5" step="0.1">
+            <div class="panel-section">
+                <div class="section-title">视觉微调</div>
+                <div class="control-row">
+                    <div class="control-label">辉光强度 <span id="val-bloom" class="control-val">1.5</span></div>
+                    <input type="range" id="inp-bloom" min="0" max="4" step="0.1">
+                </div>
+                <div class="control-row">
+                    <div class="control-label">粒子尺寸 <span id="val-size" class="control-val">0.15</span></div>
+                    <input type="range" id="inp-size" min="0.01" max="0.5" step="0.01">
+                </div>
             </div>
-            <div class="control-row">
-                <div class="control-label">粒子大小 <span id="val-size" class="control-val">0.15</span></div>
-                <input type="range" id="inp-size" min="0.01" max="0.5" step="0.01">
-            </div>
-        </div>
 
-        <div class="panel-section">
-            <div class="section-title">物理引擎 (PHYSICS)</div>
-            <div class="control-row">
-                <div class="control-label">吸附速度 <span id="val-speed" class="control-val">0.08</span></div>
-                <input type="range" id="inp-speed" min="0.01" max="0.3" step="0.001">
+            <div class="panel-section">
+                <div class="section-title">物理参数</div>
+                <div class="control-row">
+                    <div class="control-label">复位速度 <span id="val-speed" class="control-val">0.08</span></div>
+                    <input type="range" id="inp-speed" min="0.01" max="0.3" step="0.001">
+                </div>
+                <div class="control-row">
+                    <div class="control-label">爆炸力度 <span id="val-force" class="control-val">15.0</span></div>
+                    <input type="range" id="inp-force" min="1.0" max="30.0" step="0.1">
+                </div>
             </div>
-            <div class="control-row">
-                <div class="control-label">爆炸力度 <span id="val-force" class="control-val">15.0</span></div>
-                <input type="range" id="inp-force" min="1.0" max="30.0" step="0.1">
-            </div>
-             <div class="control-row">
-                <div class="control-label">重力场 <span id="val-gravity" class="control-val">0.05</span></div>
-                <input type="range" id="inp-gravity" min="0.0" max="0.2" step="0.01">
+            
+            <div style="text-align:center; font-size:10px; color:#445; margin-top:10px;">
+                NEURAL_LINK_V4.0 // CONNECTED
             </div>
         </div>
     </div>
@@ -206,69 +221,85 @@
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-        // --- DOM 缓存 ---
-        const logEl = document.getElementById('debug-log');
-        const gestureText = document.getElementById('gesture-text');
-        const gestureIcon = document.getElementById('gesture-icon');
-        const videoElement = document.getElementById('video-input');
+        // --- 移动端检测 ---
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
         
-        // UI Inputs
+        // --- UI & DOM ---
         const ui = {
             model: document.getElementById('inp-model'),
             scale: document.getElementById('inp-scale'),
-            rotate: document.getElementById('inp-rotate'),
             bloom: document.getElementById('inp-bloom'),
             size: document.getElementById('inp-size'),
             speed: document.getElementById('inp-speed'),
             force: document.getElementById('inp-force'),
-            gravity: document.getElementById('inp-gravity'),
-            // Value labels
+            // Labels
             v_scale: document.getElementById('val-scale'),
             v_bloom: document.getElementById('val-bloom'),
             v_size: document.getElementById('val-size'),
             v_speed: document.getElementById('val-speed'),
             v_force: document.getElementById('val-force'),
-            v_gravity: document.getElementById('val-gravity'),
         };
 
-        const log = (msg) => {
-            if(!logEl) return;
-            const line = document.createElement('div');
-            line.className = 'log-line';
-            line.innerText = `> ${msg}`;
-            logEl.appendChild(line);
-            while (logEl.childElementCount > 8) logEl.removeChild(logEl.firstChild);
-        };
+        const panel = document.getElementById('cyber-panel');
+        const panelHeader = document.getElementById('panel-header');
+        const gestureText = document.getElementById('gesture-text');
+        const gestureIcon = document.getElementById('gesture-icon');
+        const videoElement = document.getElementById('video-input');
+        
+        // --- 面板折叠逻辑 ---
+        if(isMobile) {
+            panelHeader.addEventListener('click', () => {
+                panel.classList.toggle('minimized');
+            });
+            // 点击内容区域以外如果不小心点到Header也可以处理，不过主要是Header点击
+        } else {
+            panel.classList.remove('minimized'); // 桌面端默认展开
+        }
 
         // --- Config ---
         const CONFIG = {
             model: "🧠 神经网络",
-            particleCount: 35000,
-            
-            // 值会由 UI 驱动
-            globalScale: 2.0,  
+            particleCount: isMobile ? 12000 : 30000, 
+            globalScale: isMobile ? 1.5 : 2.0,  
             bloomStrength: 1.5,
-            particleSize: 0.15,
+            particleSize: isMobile ? 0.25 : 0.15,
             colorBase: '#00f3ff', 
             colorAlt: '#ff0055',
             autoRotate: true,
-            
-            returnSpeed: 0.08,    
-            friction: 0.94,      
-            jitter: 0.5,       
-            gravity: 0.05,        
+            returnSpeed: 0.08,     
+            friction: 0.92,       
+            jitter: 0.5,        
+            gravity: 0.05,         
             explosionForce: 15.0, 
         };
 
-        // --- Three.js ---
+        // --- Three.js Setup ---
         const scene = new THREE.Scene();
         scene.fog = new THREE.FogExp2(0x000000, 0.02);
+        
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 35;
+        
+        // --- 关键：自适应摄像机距离算法 ---
+        function adjustCamera() {
+            const aspect = window.innerWidth / window.innerHeight;
+            let baseZ = 35; 
+            
+            if (aspect < 1.0) {
+                // 竖屏模式：因为宽度不够，需要大幅拉远摄像机
+                // 简单的反比算法：长宽比越小，距离越远
+                baseZ = 35 / aspect; 
+                // 限制最大距离防止太远
+                baseZ = Math.min(baseZ, 70); 
+            }
+            
+            camera.position.z = baseZ;
+            camera.aspect = aspect;
+            camera.updateProjectionMatrix();
+        }
         
         const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2)); 
         document.getElementById('canvas-container').appendChild(renderer.domElement);
 
         const composer = new EffectComposer(renderer);
@@ -362,36 +393,28 @@
             "🎆 烟花模式": (i) => null
         };
 
-        // --- UI Logic Binding ---
-        // 1. 填充下拉菜单
+        // --- UI Logic ---
         Object.keys(shapes).forEach(key => {
             const opt = document.createElement('option');
             opt.value = key; opt.innerText = key;
             ui.model.appendChild(opt);
         });
 
-        // 2. 辅助函数：更新UI数值显示
         function syncUI() {
             ui.scale.value = CONFIG.globalScale; ui.v_scale.innerText = CONFIG.globalScale.toFixed(2);
-            ui.rotate.checked = CONFIG.autoRotate;
             ui.bloom.value = CONFIG.bloomStrength; ui.v_bloom.innerText = CONFIG.bloomStrength.toFixed(1);
             ui.size.value = CONFIG.particleSize; ui.v_size.innerText = CONFIG.particleSize.toFixed(2);
             ui.speed.value = CONFIG.returnSpeed; ui.v_speed.innerText = CONFIG.returnSpeed.toFixed(3);
             ui.force.value = CONFIG.explosionForce; ui.v_force.innerText = CONFIG.explosionForce.toFixed(1);
-            ui.gravity.value = CONFIG.gravity; ui.v_gravity.innerText = CONFIG.gravity.toFixed(2);
             ui.model.value = CONFIG.model;
         }
 
-        // 3. 事件监听
         ui.model.addEventListener('change', (e) => switchMode(e.target.value));
-        
         ui.scale.addEventListener('input', (e) => { 
             CONFIG.globalScale = parseFloat(e.target.value); 
             particleSystem.scale.set(CONFIG.globalScale, CONFIG.globalScale, CONFIG.globalScale); 
             ui.v_scale.innerText = CONFIG.globalScale.toFixed(2);
         });
-        ui.rotate.addEventListener('change', (e) => CONFIG.autoRotate = e.target.checked);
-        
         ui.bloom.addEventListener('input', (e) => {
             CONFIG.bloomStrength = parseFloat(e.target.value);
             bloomPass.strength = CONFIG.bloomStrength;
@@ -404,35 +427,23 @@
         });
         ui.speed.addEventListener('input', (e) => { CONFIG.returnSpeed = parseFloat(e.target.value); ui.v_speed.innerText = CONFIG.returnSpeed.toFixed(3); });
         ui.force.addEventListener('input', (e) => { CONFIG.explosionForce = parseFloat(e.target.value); ui.v_force.innerText = CONFIG.explosionForce.toFixed(1); });
-        ui.gravity.addEventListener('input', (e) => { CONFIG.gravity = parseFloat(e.target.value); ui.v_gravity.innerText = CONFIG.gravity.toFixed(2); });
 
-
-        // --- Mode Switching ---
         function switchMode(name) {
             CONFIG.model = name;
             const isFirework = (name === "🎆 烟花模式");
-            log(`SYSTEM_MODE >> [${name}]`);
             updateColors(isFirework);
 
             if (isFirework) {
-                // 烟花预设
                 CONFIG.globalScale = 0.1;
                 CONFIG.bloomStrength = 2.8;
-                CONFIG.particleSize = 0.25;
+                CONFIG.particleSize = isMobile ? 0.35 : 0.25;
                 CONFIG.returnSpeed = 0.05;
-                CONFIG.friction = 0.96;
-                CONFIG.gravity = 0.06;
-                CONFIG.explosionForce = 15.0;
-                
                 updateUI("发射系统就绪", "🚀", "#fcee0a");
             } else {
-                // 普通预设
-                CONFIG.globalScale = 2.0;
+                CONFIG.globalScale = isMobile ? 1.5 : 2.0;
                 CONFIG.bloomStrength = 0.93;
-                CONFIG.particleSize = 0.15;
+                CONFIG.particleSize = isMobile ? 0.25 : 0.15;
                 CONFIG.returnSpeed = 0.08;
-                CONFIG.friction = 0.84;
-                CONFIG.gravity = 0.05; // 虽不常用，但也重置一下
                 
                 const gen = shapes[name];
                 for(let i=0; i<CONFIG.particleCount; i++) {
@@ -442,11 +453,10 @@
                 updateUI("模型加载完成", "💠", "#00f3ff");
             }
             
-            // 应用到场景和UI
             particleSystem.scale.set(CONFIG.globalScale, CONFIG.globalScale, CONFIG.globalScale);
             bloomPass.strength = CONFIG.bloomStrength;
             material.size = CONFIG.particleSize;
-            syncUI(); // 关键：更新滑块位置
+            syncUI(); 
         }
 
         function updateUI(text, icon, color) {
@@ -466,6 +476,15 @@
         const mouse = { x: 0, y: 0 };
         const state = { isFist: false, wasFist: false, handCenter: {x:0, y:0} };
 
+        // 触摸/鼠标 交互
+        window.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0 && !aiReady) {
+                const t = e.touches[0];
+                mouse.x = (t.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(t.clientY / window.innerHeight) * 2 + 1;
+            }
+        }, { passive: false }); // passive: false 允许阻止默认行为，但上面我们用了 touch-action: none 所以这里可以 relaxed
+
         window.addEventListener('mousemove', (e) => {
             if(!aiReady) {
                 mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -479,23 +498,32 @@
         }
 
         async function initAI() {
-            log("INIT_NEURAL_ENGINE...");
-            document.getElementById('progress-fill').style.width = "50%";
+            document.getElementById('progress-fill').style.width = "60%";
             try {
                 hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-                hands.setOptions({maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6});
+                hands.setOptions({
+                    maxNumHands: 1, 
+                    modelComplexity: isMobile ? 0 : 1, 
+                    minDetectionConfidence: 0.6
+                });
                 hands.onResults(onResults);
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, facingMode: "user" } });
+                
+                const constraints = { video: { width: 320, height: 240, facingMode: "user" } };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 videoElement.srcObject = stream;
                 await new Promise(r => videoElement.onloadedmetadata = () => { videoElement.play(); r(); });
-                log("视觉链路 [CONNECTED]");
+                
                 document.getElementById('progress-fill').style.width = "100%";
                 aiReady = true;
                 forceHideLoader();
                 detectLoop();
             } catch (err) {
-                log("视觉链路中断: " + err.message);
-                setTimeout(() => { forceHideLoader(); updateUI("鼠标调试模式", "🖱️", "#aaa"); }, 1500);
+                console.log(err);
+                setTimeout(() => { 
+                    forceHideLoader(); 
+                    document.getElementById('cam-wrapper').style.display = 'none'; // 隐藏摄像头框
+                    updateUI(isMobile ? "触摸/摄像头不可用" : "鼠标调试模式", isMobile ? "👆" : "🖱️", "#aaa"); 
+                }, 1500);
             }
         }
 
@@ -505,7 +533,6 @@
         }
 
         function triggerFireworkBlast() {
-            log("DETONATION_SEQUENCE_INIT");
             const oldBloom = bloomPass.strength;
             bloomPass.strength = oldBloom * 3.0; 
             setTimeout(() => bloomPass.strength = oldBloom, 300);
@@ -565,13 +592,14 @@
             const cx = aiReady ? state.handCenter.x : mouse.x;
             const cy = aiReady ? state.handCenter.y : mouse.y;
             if (!state.isFist) {
-                scene.rotation.x += (cy * 0.2 - scene.rotation.x) * 0.05;
-                scene.rotation.y += (cx * 0.2 - scene.rotation.y) * 0.05;
+                const sensitivity = isMobile ? 0.03 : 0.05;
+                scene.rotation.x += (cy * 0.2 - scene.rotation.x) * sensitivity;
+                scene.rotation.y += (cx * 0.2 - scene.rotation.y) * sensitivity;
             }
 
             // Breathing / Zoom Logic
             if (!isFireworkMode) {
-                const targetScale = state.isFist ? 2.5 : 1.0; // 握拳放大到2.5倍
+                const targetScale = state.isFist ? 2.5 : 1.0;
                 smoothExpansion += (targetScale - smoothExpansion) * 0.08;
             }
 
@@ -622,13 +650,15 @@
             composer.render();
         }
 
-        // 默认启动
+        // 启动
         switchMode("🧠 神经网络");
+        adjustCamera(); // 初始调用适应屏幕
         
         window.addEventListener('load', initAI);
         window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth,window.innerHeight); composer.setSize(window.innerWidth,window.innerHeight);
+            renderer.setSize(window.innerWidth,window.innerHeight); 
+            composer.setSize(window.innerWidth,window.innerHeight);
+            adjustCamera(); // 窗口变化时重新适应
         });
 
         animate();
