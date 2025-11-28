@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CYBERPUNK NEURAL LINK v3.7 // HUD INTERFACE</title>
+    <title>CYBERPUNK NEURAL LINK v4.5 // SPARK TRAIL</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
         :root { --neon-blue: #00f3ff; --neon-pink: #ff0055; --neon-yellow: #fcee0a; --bg-dark: #050505; --glass: rgba(0, 20, 30, 0.75); }
@@ -61,7 +61,7 @@
             font-family: 'Share Tech Mono';
         }
         #cyber-panel::before {
-            content: "SYS_CONFIG_V3.7";
+            content: "SYS_CONFIG_V4.5";
             position: absolute; top: -10px; right: 10px;
             background: var(--bg-dark); border: 1px solid var(--neon-blue);
             color: var(--neon-blue); font-size: 10px; padding: 2px 5px;
@@ -132,7 +132,7 @@
     <div id="vignette"></div>
 
     <div id="loader">
-        <h1 style="font-family: 'Orbitron'; letter-spacing: 5px; color: var(--neon-blue);">NEURAL LINK v3.7</h1>
+        <h1 style="font-family: 'Orbitron'; letter-spacing: 5px; color: var(--neon-blue);">NEURAL LINK v4.5</h1>
         <div class="loader-bar"><div class="loader-progress" id="progress-fill"></div></div>
         <div id="loader-text" style="margin-top: 10px; color: #666; font-size: 12px;">加载全息界面...</div>
     </div>
@@ -182,7 +182,7 @@
         <div class="panel-section">
             <div class="section-title">物理引擎 (PHYSICS)</div>
             <div class="control-row">
-                <div class="control-label">吸附速度 <span id="val-speed" class="control-val">0.08</span></div>
+                <div class="control-label">尾迹长度/阻力 <span id="val-speed" class="control-val">0.08</span></div>
                 <input type="range" id="inp-speed" min="0.01" max="0.3" step="0.001">
             </div>
             <div class="control-row">
@@ -243,7 +243,7 @@
         // --- Config ---
         const CONFIG = {
             model: "🧠 神经网络",
-            particleCount: 35000,
+            particleCount: 40000,
             
             // 值会由 UI 驱动
             globalScale: 2.0,  
@@ -280,7 +280,7 @@
         const tex = (() => {
             const c = document.createElement('canvas'); c.width=16; c.height=16;
             const ctx = c.getContext('2d');
-            ctx.fillStyle = '#ffffff'; ctx.fillRect(4,4,8,8);
+            ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(8,8,6,0,Math.PI*2); ctx.fill(); 
             return new THREE.Texture(c);
         })();
         tex.needsUpdate = true;
@@ -291,10 +291,17 @@
         const currentPositions = new Float32Array(CONFIG.particleCount * 3);
         const targetPositions = new Float32Array(CONFIG.particleCount * 3); 
         const velocities = new Float32Array(CONFIG.particleCount * 3);
+        
+        // 新增：粒子的生命周期 (0.0 = 死, 1.0 = 新生)
+        const life = new Float32Array(CONFIG.particleCount);
+        // 新增：随机种子
+        const randoms = new Float32Array(CONFIG.particleCount);
 
         for(let i=0; i<CONFIG.particleCount; i++) {
-            positions[i*3] = (Math.random()-0.5)*5; positions[i*3+1] = (Math.random()-0.5)*5; positions[i*3+2] = (Math.random()-0.5)*5;
+            positions[i*3] = (Math.random()-0.5)*50; positions[i*3+1] = (Math.random()-0.5)*50; positions[i*3+2] = (Math.random()-0.5)*50;
             currentPositions[i*3] = positions[i*3]; currentPositions[i*3+1] = positions[i*3+1]; currentPositions[i*3+2] = positions[i*3+2];
+            randoms[i] = Math.random();
+            life[i] = 0; // 初始全死
         }
 
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -302,25 +309,28 @@
 
         const material = new THREE.PointsMaterial({
             size: CONFIG.particleSize, map: tex, vertexColors: true,
-            blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.9
+            blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 1.0
         });
         const particleSystem = new THREE.Points(geometry, material);
         scene.add(particleSystem);
 
-        const updateColors = (isFirework = false) => {
+        const updateColors = (mode = "default") => {
             const c1 = new THREE.Color(CONFIG.colorBase);
             const c2 = new THREE.Color(CONFIG.colorAlt);
+            
             const attr = geometry.attributes.color;
             for(let i=0; i<CONFIG.particleCount; i++) {
-                if (isFirework) {
+                if (mode === "firework") {
                     const r = Math.random();
                     let color = new THREE.Color();
                     if (r > 0.8) color.setHex(0xffffff); 
                     else if (r > 0.6) color.setHex(0xffaa00);
                     else if (r > 0.4) color.setHex(0xff0055);
-                    else if (r > 0.2) color.setHex(0x00f3ff);
                     else color.setHSL(Math.random(), 1.0, 0.6);
                     attr.setXYZ(i, color.r, color.g, color.b);
+                } else if (mode === "spark") {
+                    // 初始化为暗色，颜色将在 animate 中基于 life 动态更新
+                    attr.setXYZ(i, 0, 0, 0); 
                 } else {
                     const isBlue = Math.random() > 0.5;
                     attr.setXYZ(i, isBlue?c1.r:c2.r, isBlue?c1.g:c2.g, isBlue?c1.b:c2.b);
@@ -332,6 +342,7 @@
 
         // --- Shapes ---
         const shapes = {
+            "✨ 指尖火花 (Finger Spark)": (i) => null, // 动态发射器
             "🧠 神经网络": (i) => {
                  const theta = Math.random() * Math.PI * 2, phi = Math.acos(2 * Math.random() - 1);
                  const r = 10 * Math.cbrt(Math.random()); 
@@ -363,14 +374,12 @@
         };
 
         // --- UI Logic Binding ---
-        // 1. 填充下拉菜单
         Object.keys(shapes).forEach(key => {
             const opt = document.createElement('option');
             opt.value = key; opt.innerText = key;
             ui.model.appendChild(opt);
         });
 
-        // 2. 辅助函数：更新UI数值显示
         function syncUI() {
             ui.scale.value = CONFIG.globalScale; ui.v_scale.innerText = CONFIG.globalScale.toFixed(2);
             ui.rotate.checked = CONFIG.autoRotate;
@@ -382,26 +391,11 @@
             ui.model.value = CONFIG.model;
         }
 
-        // 3. 事件监听
         ui.model.addEventListener('change', (e) => switchMode(e.target.value));
-        
-        ui.scale.addEventListener('input', (e) => { 
-            CONFIG.globalScale = parseFloat(e.target.value); 
-            particleSystem.scale.set(CONFIG.globalScale, CONFIG.globalScale, CONFIG.globalScale); 
-            ui.v_scale.innerText = CONFIG.globalScale.toFixed(2);
-        });
+        ui.scale.addEventListener('input', (e) => { CONFIG.globalScale = parseFloat(e.target.value); particleSystem.scale.set(CONFIG.globalScale, CONFIG.globalScale, CONFIG.globalScale); ui.v_scale.innerText = CONFIG.globalScale.toFixed(2);});
         ui.rotate.addEventListener('change', (e) => CONFIG.autoRotate = e.target.checked);
-        
-        ui.bloom.addEventListener('input', (e) => {
-            CONFIG.bloomStrength = parseFloat(e.target.value);
-            bloomPass.strength = CONFIG.bloomStrength;
-            ui.v_bloom.innerText = CONFIG.bloomStrength.toFixed(1);
-        });
-        ui.size.addEventListener('input', (e) => {
-            CONFIG.particleSize = parseFloat(e.target.value);
-            material.size = CONFIG.particleSize;
-            ui.v_size.innerText = CONFIG.particleSize.toFixed(2);
-        });
+        ui.bloom.addEventListener('input', (e) => { CONFIG.bloomStrength = parseFloat(e.target.value); bloomPass.strength = CONFIG.bloomStrength; ui.v_bloom.innerText = CONFIG.bloomStrength.toFixed(1); });
+        ui.size.addEventListener('input', (e) => { CONFIG.particleSize = parseFloat(e.target.value); material.size = CONFIG.particleSize; ui.v_size.innerText = CONFIG.particleSize.toFixed(2); });
         ui.speed.addEventListener('input', (e) => { CONFIG.returnSpeed = parseFloat(e.target.value); ui.v_speed.innerText = CONFIG.returnSpeed.toFixed(3); });
         ui.force.addEventListener('input', (e) => { CONFIG.explosionForce = parseFloat(e.target.value); ui.v_force.innerText = CONFIG.explosionForce.toFixed(1); });
         ui.gravity.addEventListener('input', (e) => { CONFIG.gravity = parseFloat(e.target.value); ui.v_gravity.innerText = CONFIG.gravity.toFixed(2); });
@@ -410,12 +404,13 @@
         // --- Mode Switching ---
         function switchMode(name) {
             CONFIG.model = name;
-            const isFirework = (name === "🎆 烟花模式");
             log(`SYSTEM_MODE >> [${name}]`);
-            updateColors(isFirework);
+            
+            const isFirework = (name === "🎆 烟花模式");
+            const isSpark = (name.includes("火花"));
 
             if (isFirework) {
-                // 烟花预设
+                updateColors("firework");
                 CONFIG.globalScale = 0.1;
                 CONFIG.bloomStrength = 2.8;
                 CONFIG.particleSize = 0.25;
@@ -423,16 +418,41 @@
                 CONFIG.friction = 0.96;
                 CONFIG.gravity = 0.06;
                 CONFIG.explosionForce = 15.0;
-                
                 updateUI("发射系统就绪", "🚀", "#fcee0a");
+            } else if (isSpark) {
+                updateColors("spark");
+                CONFIG.globalScale = 1.0; 
+                CONFIG.bloomStrength = 2.5; // 超亮
+                CONFIG.particleSize = 0.3; 
+                CONFIG.returnSpeed = 0.05; // 这里用作“阻力”系数，越小阻力越小
+                CONFIG.friction = 0.92; 
+                CONFIG.gravity = 0.03;
+                CONFIG.autoRotate = false; 
+                scene.rotation.set(0,0,0); 
+                updateUI("待机模式 (IDLE)", "💤", "#555");
+                
+                // 初始将所有粒子重置到屏幕外或中心
+                for(let i=0; i<CONFIG.particleCount; i++) {
+                    life[i] = 0; // 全部杀死，等待发射
+                    const idx = i*3;
+                    // 放在中间形成一个待机环
+                    const theta = Math.random() * Math.PI * 2;
+                    const r = 5 + Math.random() * 2;
+                    currentPositions[idx] = r * Math.cos(theta);
+                    currentPositions[idx+1] = r * Math.sin(theta);
+                    currentPositions[idx+2] = (Math.random()-0.5) * 2;
+                    velocities[idx] = 0; velocities[idx+1] = 0; velocities[idx+2] = 0;
+                }
+
             } else {
-                // 普通预设
+                updateColors("default");
                 CONFIG.globalScale = 2.0;
                 CONFIG.bloomStrength = 0.93;
                 CONFIG.particleSize = 0.15;
                 CONFIG.returnSpeed = 0.08;
                 CONFIG.friction = 0.84;
-                CONFIG.gravity = 0.05; // 虽不常用，但也重置一下
+                CONFIG.gravity = 0.05;
+                CONFIG.autoRotate = true;
                 
                 const gen = shapes[name];
                 for(let i=0; i<CONFIG.particleCount; i++) {
@@ -442,32 +462,37 @@
                 updateUI("模型加载完成", "💠", "#00f3ff");
             }
             
-            // 应用到场景和UI
             particleSystem.scale.set(CONFIG.globalScale, CONFIG.globalScale, CONFIG.globalScale);
             bloomPass.strength = CONFIG.bloomStrength;
             material.size = CONFIG.particleSize;
-            syncUI(); // 关键：更新滑块位置
+            syncUI();
         }
 
         function updateUI(text, icon, color) {
             if (!gestureText || !gestureIcon) return;
-            if (gestureText.innerText !== text) {
-                gestureText.innerText = text;
-                gestureText.style.color = color;
-                gestureText.parentElement.style.borderColor = color;
-                gestureText.parentElement.style.boxShadow = `0 0 15px ${color}40`;
-                gestureIcon.innerText = icon;
-            }
+            if (gestureText.innerText === text) return;
+            gestureText.innerText = text;
+            gestureText.style.color = color;
+            gestureText.parentElement.style.borderColor = color;
+            gestureText.parentElement.style.boxShadow = `0 0 15px ${color}40`;
+            gestureIcon.innerText = icon;
         }
 
         // --- Logic ---
         let hands;
         let aiReady = false;
         const mouse = { x: 0, y: 0 };
-        const state = { isFist: false, wasFist: false, handCenter: {x:0, y:0} };
+        const state = { 
+            isFist: false, 
+            wasFist: false, 
+            handCenter: {x:0, y:0},
+            indexTip: {x:0, y:0, z:0},
+            prevIndexTip: {x:0, y:0, z:0}, // 记录上一帧位置计算速度
+            isFingerUp: false 
+        };
 
         window.addEventListener('mousemove', (e) => {
-            if(!aiReady) {
+            if(!aiReady || CONFIG.model.includes("火花")) {
                 mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
                 mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
             }
@@ -504,6 +529,7 @@
             requestAnimationFrame(detectLoop);
         }
 
+        // 烟花逻辑
         function triggerFireworkBlast() {
             log("DETONATION_SEQUENCE_INIT");
             const oldBloom = bloomPass.strength;
@@ -522,16 +548,30 @@
         }
 
         function onResults(results) {
+            const isSparkMode = CONFIG.model.includes("火花");
+
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const lm = results.multiHandLandmarks[0];
                 state.handCenter.x = (lm[9].x - 0.5) * 2; state.handCenter.y = (lm[9].y - 0.5) * 2;
                 
+                // 记录上一帧
+                state.prevIndexTip.x = state.indexTip.x;
+                state.prevIndexTip.y = state.indexTip.y;
+                state.prevIndexTip.z = state.indexTip.z;
+
+                state.indexTip.x = (lm[8].x - 0.5) * 2;
+                state.indexTip.y = (lm[8].y - 0.5) * 2;
+                state.indexTip.z = lm[8].z; 
+
                 const index=lm[8], middle=lm[12], ring=lm[16], pinky=lm[20];
                 state.isFist = (index.y > lm[6].y && middle.y > lm[10].y && ring.y > lm[14].y && pinky.y > lm[18].y);
+                state.isFingerUp = (index.y < lm[6].y && middle.y > lm[10].y);
 
                 const isFireworkMode = (CONFIG.model === "🎆 烟花模式");
                 
-                if (isFireworkMode) {
+                if (isSparkMode) {
+                     updateUI("粒子喷射 (EMIT)", "✨", "#fcee0a");
+                } else if (isFireworkMode) {
                     if (state.isFist) updateUI("引力充能 (HOLD)", "✊", "#ff0055");
                     else {
                         if (state.wasFist) triggerFireworkBlast();
@@ -544,41 +584,147 @@
                 state.wasFist = state.isFist;
             } else {
                 state.isFist = false;
-                updateUI("寻找信号...", "⚠️", "#555");
+                state.isFingerUp = false;
+                if (isSparkMode) updateUI("系统待机 (IDLE)", "💤", "#555");
+                else updateUI("寻找信号...", "⚠️", "#555");
             }
         }
 
         // --- Loop ---
         const clock = new THREE.Clock();
         let smoothExpansion = 1.0; 
+        
+        // 专门用于 Spark 模式的循环指针
+        let spawnIndex = 0; 
 
         function animate() {
             requestAnimationFrame(animate);
             const time = clock.getElapsedTime();
             const positionsAttr = geometry.attributes.position;
+            const colorsAttr = geometry.attributes.color;
+            
             const isFireworkMode = (CONFIG.model === "🎆 烟花模式");
+            const isSparkMode = CONFIG.model.includes("火花");
 
             // Rotation
-            if (CONFIG.autoRotate && !state.isFist) scene.rotation.y += 0.002;
+            if (CONFIG.autoRotate && !state.isFist && !isSparkMode) scene.rotation.y += 0.002;
             
-            // View Control
-            const cx = aiReady ? state.handCenter.x : mouse.x;
-            const cy = aiReady ? state.handCenter.y : mouse.y;
-            if (!state.isFist) {
-                scene.rotation.x += (cy * 0.2 - scene.rotation.x) * 0.05;
-                scene.rotation.y += (cx * 0.2 - scene.rotation.y) * 0.05;
+            // View Control (普通模式下)
+            if (!isSparkMode) {
+                const cx = aiReady ? state.handCenter.x : mouse.x;
+                const cy = aiReady ? state.handCenter.y : mouse.y;
+                if (!state.isFist) {
+                    scene.rotation.x += (cy * 0.2 - scene.rotation.x) * 0.05;
+                    scene.rotation.y += (cx * 0.2 - scene.rotation.y) * 0.05;
+                }
+                 if (!isFireworkMode) {
+                    const targetScale = state.isFist ? 2.5 : 1.0; 
+                    smoothExpansion += (targetScale - smoothExpansion) * 0.08;
+                }
             }
 
-            // Breathing / Zoom Logic
-            if (!isFireworkMode) {
-                const targetScale = state.isFist ? 2.5 : 1.0; // 握拳放大到2.5倍
-                smoothExpansion += (targetScale - smoothExpansion) * 0.08;
+            // --- 核心物理循环 ---
+            
+            let fingerX = 0, fingerY = 0, fingerZ = 0;
+            let velX = 0, velY = 0; // 手指移动速度
+            let hasActiveInput = false;
+
+            if (isSparkMode) {
+                if (aiReady && state.isFingerUp) {
+                    fingerX = -state.indexTip.x * 25; 
+                    fingerY = -state.indexTip.y * 15;
+                    fingerZ = 0;
+                    // 计算手指速度，用于给粒子惯性
+                    velX = (-state.indexTip.x - -state.prevIndexTip.x) * 25;
+                    velY = (-state.indexTip.y - -state.prevIndexTip.y) * 15;
+                    hasActiveInput = true;
+                } else if (!aiReady) {
+                    // 鼠标模拟
+                    fingerX = mouse.x * 25;
+                    fingerY = mouse.y * 15;
+                    // 简单的鼠标速度模拟
+                    hasActiveInput = true; 
+                }
+
+                // === 粒子发射逻辑 (每帧发射一批) ===
+                // 只有检测到输入，或者在演示模式下才发射
+                if (hasActiveInput) {
+                    const spawnCount = 800; // 每帧发射数量，越大尾迹越浓
+                    for(let j=0; j<spawnCount; j++) {
+                        spawnIndex = (spawnIndex + 1) % CONFIG.particleCount;
+                        life[spawnIndex] = 1.0; // 复活
+                        
+                        const idx = spawnIndex * 3;
+                        // 1. 位置：重置到指尖，加一点随机抖动
+                        currentPositions[idx]   = fingerX + (Math.random()-0.5) * 0.5;
+                        currentPositions[idx+1] = fingerY + (Math.random()-0.5) * 0.5;
+                        currentPositions[idx+2] = fingerZ + (Math.random()-0.5) * 0.5;
+
+                        // 2. 速度：继承手指速度 + 随机爆炸速度
+                        // 稍微反向一点，制造拖尾
+                        const spread = 0.5;
+                        velocities[idx]   = velX * 0.5 + (Math.random()-0.5) * spread;
+                        velocities[idx+1] = velY * 0.5 + (Math.random()-0.5) * spread;
+                        velocities[idx+2] = (Math.random()-0.5) * spread;
+                    }
+                }
             }
 
             for(let i=0; i<CONFIG.particleCount; i++) {
                 const idx = i*3;
                 
-                if (isFireworkMode) {
+                if (isSparkMode) {
+                    // === 火花物理 ===
+                    if (life[i] > 0) {
+                        // 活着：应用物理
+                        velocities[idx]   *= CONFIG.friction; // 空气阻力
+                        velocities[idx+1] *= CONFIG.friction;
+                        velocities[idx+2] *= CONFIG.friction;
+                        
+                        velocities[idx+1] -= CONFIG.gravity; // 重力下坠
+
+                        currentPositions[idx]   += velocities[idx];
+                        currentPositions[idx+1] += velocities[idx+1];
+                        currentPositions[idx+2] += velocities[idx+2];
+
+                        // 颜色和透明度随寿命衰减
+                        life[i] -= 0.02; // 衰减速度
+
+                        // 颜色映射：
+                        // Life 1.0 -> 0.8 : 白/金 (核心)
+                        // Life 0.8 -> 0.4 : 霓虹蓝/紫 (中段)
+                        // Life 0.4 -> 0.0 : 暗红/透明 (尾部)
+                        
+                        if (life[i] > 0.8) {
+                            colorsAttr.setXYZ(i, 1.0, 1.0, 0.8); // 亮白
+                        } else if (life[i] > 0.4) {
+                            const t = (life[i] - 0.4) / 0.4;
+                            colorsAttr.setXYZ(i, 0.0, t * 1.0, 1.0); // 蓝渐变
+                        } else {
+                            const t = life[i] / 0.4;
+                            colorsAttr.setXYZ(i, 0.5 * t, 0.0, 0.5 * t); // 紫暗
+                        }
+                    } else {
+                        // 死了/待机中
+                        // 如果没有输入，让它们在中心形成一个待机圆环，而不是消失
+                        if (!hasActiveInput) {
+                            const theta = time * 0.2 + i * 0.01;
+                            const r = 8 + Math.sin(time + i*0.1) * 2;
+                            // 缓慢旋转
+                            currentPositions[idx]   = Math.cos(theta) * r;
+                            currentPositions[idx+1] = Math.sin(theta) * r * 0.5; // 压扁一点
+                            currentPositions[idx+2] = Math.sin(time*0.5 + i) * 2;
+                            
+                            // 非常暗淡的颜色
+                            colorsAttr.setXYZ(i, 0.0, 0.05, 0.1); 
+                        } else {
+                             // 如果有输入但这个粒子还没轮到发射，就藏起来
+                             currentPositions[idx] = 9999; 
+                        }
+                    }
+
+                } else if (isFireworkMode) {
+                    // ... (保持不变)
                     if (state.isFist) {
                         const pullSpeed = 0.2; 
                         velocities[idx]   += (0 - currentPositions[idx]) * pullSpeed;
@@ -595,8 +741,12 @@
                     } else {
                         velocities[idx+1] -= CONFIG.gravity; 
                         velocities[idx] *= CONFIG.friction; velocities[idx+1] *= CONFIG.friction; velocities[idx+2] *= CONFIG.friction;
+                        currentPositions[idx]   += velocities[idx];
+                        currentPositions[idx+1] += velocities[idx+1];
+                        currentPositions[idx+2] += velocities[idx+2];
                     }
                 } else {
+                    // ... (保持不变)
                     let tx = targetPositions[idx] * smoothExpansion;
                     let ty = targetPositions[idx+1] * smoothExpansion;
                     let tz = targetPositions[idx+2] * smoothExpansion;
@@ -609,16 +759,23 @@
                     velocities[idx+2] += (tz - currentPositions[idx+2]) * CONFIG.returnSpeed;
                     
                     velocities[idx] *= CONFIG.friction; velocities[idx+1] *= CONFIG.friction; velocities[idx+2] *= CONFIG.friction;
+                    
+                    currentPositions[idx]   += velocities[idx];
+                    currentPositions[idx+1] += velocities[idx+1];
+                    currentPositions[idx+2] += velocities[idx+2];
                 }
 
-                currentPositions[idx]   += velocities[idx];
-                currentPositions[idx+1] += velocities[idx+1];
-                currentPositions[idx+2] += velocities[idx+2];
+                if (!isFireworkMode && !isSparkMode) {
+                     // 普通模式的坐标更新也在上面统一了，这里确保一下
+                }
+                
                 positionsAttr.array[idx]   = currentPositions[idx];
                 positionsAttr.array[idx+1] = currentPositions[idx+1];
                 positionsAttr.array[idx+2] = currentPositions[idx+2];
             }
             positionsAttr.needsUpdate = true;
+            if(isSparkMode) colorsAttr.needsUpdate = true; 
+
             composer.render();
         }
 
